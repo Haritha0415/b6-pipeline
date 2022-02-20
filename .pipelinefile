@@ -1,0 +1,53 @@
+pipeline{
+    agent{
+        label 'node-1'
+    }
+    tools{
+        maven 'mvn-3.0.5'
+        }
+    stages{
+        stage('Message'){
+            steps{
+                echo "WELCOME TO DEVOPS+GCP"
+            }
+        }
+        stage('Checkout'){
+            steps{
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Haritha0415/mvn-b6.git']]])
+            }
+        }
+        stage('Build'){
+            steps{
+            sh 'mvn package -f pom.xml'
+            }
+        }
+         stage('Approvals to Deployment in STAGE envs'){
+            steps{
+                echo "Taking approval from Manager to deploy wars"
+                timeout(time: 7, unit: 'DAYS') {
+                input message: 'Do you want to deploy  wars in stage env?', submitter: 'harithaboddu98'
+                }
+            }
+        }
+        stage('Deploying war file'){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: 'TOMCAT', path: '', url: 'http://35.223.255.134:8090/')], contextPath: 'flipkart', war: 'target/flipkart.war'
+            }
+        }
+        stage('Approvals to NEXUS REPO'){
+            steps{
+                echo "Taking approval from Manager for Nexus Repo"
+                timeout(time: 7, unit: 'DAYS') {
+                input message: 'Do you approve to deploy war to NEXUS REPO?', submitter: 'harithaboddu98'
+                }
+            }
+        }
+        stage('Adding to NEXUS'){
+            steps{
+                nexusArtifactUploader artifacts: [[artifactId: 'flipkart', classifier: '', file: 'target/flipkart.war', type: 'war']], credentialsId: 'nexus', groupId: 'com.tcs', nexusUrl: 'http://35.188.200.92:8081/', nexusVersion: 'nexus3', protocol: 'http', repository: 'BATCH6', version: '1.0-SNAPSHOT'
+            }
+        }
+
+
+    }
+}
